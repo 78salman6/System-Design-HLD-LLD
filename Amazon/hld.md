@@ -16,16 +16,16 @@ I am listing down the functional and non functional requirements which I think i
 - High Availability
 - Consistency
 
-## High level diagram containing User home page and Search flow.
-
-![plot](./diagrams/Search_and_Home_Page.png)
-
 #### Convention
 
 - All components in green are user interface
 - Black color is Load Balancer ( authentication, authorization etc as well )
 - Blue components are core components
 - Component in Red are mostly related to data like databases, cache, messaging queue, big data etc
+
+## High level diagram containing User home page and Search flow.
+
+![plot](./diagrams/Search_and_Home_Page.png)
 
 #### Explanation of the components
 
@@ -61,3 +61,44 @@ If there are N pincodes and M warehouses, it will pre compute for **N\*M** possi
 ## High level diagram for User Purchase WorkFlow.
 
 ![plot](./diagrams/Purchase_WorkFLow.png)
+**Reason for Choosing OMS as MYSQL** - It will have many table - Customer Info, Item Info etc. There are a lot of **updates** happen on the **database** for each **order**. We need to make sure all those updates are **ATOMIC** and form **transaction**.
+
+#### Workflow
+
+Record gets created in **OMS** and **Order ID** gets generated. We put this entry into **Redis cache** saying that **Order ID** was created at some point in time with expiry.
+**Redis entry**
+
+```
+Order ID       Creation Time         Expiry
+01              10:00 AM             10:05 AM
+```
+
+**OMS Table Entry**
+
+```
+Order ID        CreationTime        Status
+01              10:00 AM            Created
+```
+
+Now Order taking service will call **Inventory Service** so that it will block the inventory. Suppose customer placed order for 5 unit of Television then **Inventory Service** will reduce entry in database by 5 unit for that item. Once inventory is updated it will call **Payment service**.
+
+**Workflow**
+
+1. **Order Successful** - Event posted into **Kafka** for order placed. Invoice is generated and sent to customer through email/whatsapp message.
+2. **Payment Failed** - Order Cancelled ( In OMS table entry above update Status with Cancelled ) -> Increament inventory count in Inventory Database
+3. **Payment Service Never came back** - At **10:05 AM** Redis record will expire, redis will do a **callback** and in this callback we can define our procedure which may take place on expiry. For simplicity take steps of **Payment Failure** scenario.
+
+**Race Conditions**
+Payment Successful and expiry happens in **Redis** at the same time.
+
+1. Payment Success -> Expiry happens ( It will always happen. Think logically. ). So each time payment is successful delete corresponding order entry from Redis.
+2. Expiry -> Payment Successful ( Already cancellation took place and inventory count got increamented ). 2 things we can do
+   a. Refund back to customer
+   b. Create new Order mark as placed, decreament inventory count and make it successful.
+
+**Why we are placing all events into Kafka**
+**Scenario**-> Customer bought TV and now its count became 0, so now in **Search Catalog** this item should not come otherwise it will be a bad user experience.
+
+Millions of orders can be placed in a day MYSQL will be under a lot of stress.
+Hack -> Once order reaches terminal state ( Delivered/Cancelled ) move it from MYSQL to **Cassandra**.
+Archival Cron Job will run as per the schedule and will move all terminal items into Cassandra.
