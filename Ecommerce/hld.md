@@ -1,4 +1,4 @@
-# Amazon High Level Design
+# Ecommerce High Level Design
 
 I am listing down the functional and non functional requirements which I think is important. Feel free to extend this model as per your understanding and don't forget to give feedback to me - **78salmankashif6@gmail.com**
 
