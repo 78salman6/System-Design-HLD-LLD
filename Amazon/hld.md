@@ -41,3 +41,19 @@ When user wants to search something 2 main things plays into the picture
    If **Serviciability + TAT Service**. tells item can not be delivered, Search Service will filter out those items from the result set and return rest of remaining items.
 
 **Search Service** night talk to **User Service** ( for User Data ) and it can query User Service to fetch some attributes of the User. Each time a Search happens an event is posted into **Kafka**. Reason is whenever someone is searching for an item, it says that person has the intent to buy that product in near future. That can be one of the very big source for building recommendation for the User.
+From Search User can put to **Cart/WishList**. Person is putting item in wish list giving signal for recommendation.
+**Kafka** will feed **Spark Stream**. It will be feed to **Hadoop Cluster** on top of that runs varios **DL/ML algorithms**.
+Given a User and certail kind of products that they like, system can build 2 types of recommendations
+
+1. What other products this User might like
+2. How similar is this User to other users and based on products that other users have already purchased system would recommend a particular set of products to the User.
+
+Once recommendation is processed this is placed into **cassendra Database** and it feeds **Recommendation Service** and recommendation service creates **Home page** for Customer.
+Given **User ID**
+
+1. General Recommendation
+2. Each Category Recommendation
+
+**USer Service** - It is backed up with MYSQL database and for fast query Redis cache is also there. For getting details about the user it will first query the **Redis cache** to get the details of the user. If user details are present it will be returned from Redis otherwise it will query database to get user's details from databse, place details into the **cache** and return the details to the service needing user details.
+**Serviciability + TAT Service** - It will create a graph kind of structure at the **compile time** to fast the query response from **Search Service**. What is shortest path from location A to location B ( time taken as well ).
+If there are N pincodes and M warehouses, it will pre compute for **N\*M** possible combination.
