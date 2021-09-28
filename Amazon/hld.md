@@ -57,3 +57,7 @@ Given **User ID**
 **USer Service** - It is backed up with MYSQL database and for fast query Redis cache is also there. For getting details about the user it will first query the **Redis cache** to get the details of the user. If user details are present it will be returned from Redis otherwise it will query database to get user's details from databse, place details into the **cache** and return the details to the service needing user details.
 **Serviciability + TAT Service** - It will create a graph kind of structure at the **compile time** to fast the query response from **Search Service**. What is shortest path from location A to location B ( time taken as well ).
 If there are N pincodes and M warehouses, it will pre compute for **N\*M** possible combination.
+
+## High level diagram for User Purchase WorkFlow.
+
+![plot](./diagrams/Purchase_WorkFLow.png)
