@@ -48,3 +48,13 @@ We can leverage **UDP** protocal for video calls because we are okay with data l
 #### Explanation on how video call starts
 
 ![plot](./diagrams/connector.png)
+For sending request for video call **Web Socket handler** is being used ( please bear with me I will explain the details in the coming section ). After receiver receives video call communication moves to **UDP** approach.
+**Connector** - Connectoer helps user's machine to find to their public IP address. As drawn in the above diagram. **U1** sends request to router to get its public IP address, router / NAT uses it's public IP address to send this request to **Connector** ( If you do not know details of how NAT works please do google and read. It's pretty interesting no joke on this part ). Connector knows this request is coming from router with IP address **A.B.C.D** and from **port P1** it will tell NAT that this request is coming from P1. So this way U1 will know it's publicly identified **IP address** is **A.B.C.D:P1**. Similarly U2 will also identify its public IP address. Once the public IP address is identified they will share with each other using **Web Socket** based approach.
+
+##### Group calling
+
+All groups <= 5 users ( Small group )
+All groups > 5 users ( Large group )
+
+**Small Group** Each user has to send message to each of the member in the call separately. Bandwidth will be shared.
+For N users in the group call, each user's bandwidth utilization will increase by ( N-1 ) times.
