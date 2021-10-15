@@ -66,3 +66,48 @@ From analytics if eco system comes to know people of India is watching **Money H
 ### Home Page and Search HLD
 
 ![plot](./diagrams/Home_Search.png)
+
+> Note: ELK provides **fuzzy searching**. ELK query User Service to get info about user to do some age level filtering.
+> **Tagger Service** - Puts all different tags in Kafka topic. Spark streaming service does processing then it selects let's say 100 tags and post it in Kafka topic. **Asset Service** stores those tags as metadata of movie in **Cassandra**.
+
+#### Discussion on why Cassandra
+
+1. This is the database which can handle massive reads and writes.
+2. It follows **no master** kind of strategy ( Ring of lot of nodes ). Each node stores some part of data ( each node knows what particular data resides in which node ). Cassandra is very good if you have small number of queries ( on some partition key ). It is bad at **Random queries**.
+
+> Note: Tageer service also creates many **thumbnails** ( Stored in **Hadoop cluster** ).
+
+#### How to choose best thumbnails
+
+When search results are shown to user, initially random thumbnails are shown.
+Suppose a particular thumbnail ( let's say containing Action poster ) is mostly hit by group of people with age range between 18-25. Then Recommendation service will collect this thumbnail as one of the best thumnail for the group of people in the range 18-25. For same movie let's say thumbnail with Family poster is clicked by most of people in range 35-45 then show this thumbnail to that user category.
+
+#### Form cluster of users ( Using ML model)
+
+Liking certain kind of videos makes cluster ( K mean or any other cluster forming algorithms ).
+**Cluster based on Genre**
+
+1. For each genre use other people in the cluster to find out what are the movies they watched / liked. Use that to build genre based recommendation.
+2. Searches user are doing - Whether that movie are in data store or not. Show them similar kind of movies ( in search result as well as in the user's home page ). If search for a movie crosses certain threashold try to onboard that movie into the platform.
+
+> Note: If based on analytics system can predict all the list of items customers can watch tomorrow, we can actually load the list in **Local CDN**. It will save a lot of bandwidth and will reduce the latency drastically.
+
+> Note: If new TV series is launching in **Hindi**. People of country where Hindi tounge people lives are the target audience. Target those regions.
+
+**CDN Writer** - Suppose CDN writer came to know Local CDN needs following video
+C1, C2, C3, C4, C5, C6
+Current content in Local CDN -> C1, C2, C3, C8, C9, C10
+It will delete C8, C9, C10 and will write C4, C5, C6 into the Local CDN.
+
+#### A Discussion on Decentralization
+
+Suppose videos -> C1 - C25 needs to be uploaded in many Local CDNs ( LC1, LC2, LC3, LC4, LC5 ). It will be uploaded from Main CDN ( It can be Amzon S3 / Microsoft Azure BLOB ).
+1st way is to push all 25 videos from Main CDN to all the Local CDN. In this case BLOB storage will be in high stress and it may cause **Single Point of Failure**.
+
+A better way is push C1 - C5 into LC1; C6 - C10 into LC2; C11-C15 to LC3; C16 - C20 to LC4; C21 - C25 to LC5
+Then let local CDNs to syncup ( something like how torrent works ) among themselves. This push and syncup operation may happen at the time of low traffic. Like from 3 AM in the morning.
+**Advantage of Decentralization**
+
+1. No Single point of failure
+2. Low cost
+3. Transfer during low traffic
