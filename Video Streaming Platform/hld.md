@@ -32,6 +32,8 @@ I am listing down the functional and non functional requirements which I think i
 
 #### Description of components of video upload flow
 
+![plot](./diagrams/workflow.png)
+
 1. First of all production house will upload video in their machine ( VM or anything ), then in someway they will share the machine details to the platform. Then platform using **SFTP** dumps movie to its own **BLOB storage**. Admin of video also provies **metadata** information ( uploader details, description, lot of images, large variety of tags etc ). These metata information is being stored in **Cassandra**.
 2. After successful upload happens in the blob storage, Asset **onboarding service**
    posts an event into **Kafka** about completion of storage.
@@ -43,39 +45,24 @@ I am listing down the functional and non functional requirements which I think i
 8. **Quality Converter** listens to above published topic. It converts chunk into different different quality stream. Ex - 144 p, 244 p, 480 p, 720 p etc. After compeletion of the process it posts event as Kafka topic.
 9. After the above processing, workflow engine starts to accumulate chunks of same video and it starts to upload it into **Content delivery network** ( CDN ). Then after successful completion of video upload into CDN, it posts event into Kafka. **Notification service** uses this event to send notification to production house about successful upload of their video. **Serarch consumer** will also listens to this completion event and makes this video searchable by the Users.
 
-10. TLS handshake ( overburden for the communication )
-11. TLS retry mechanism makes communication slow ( If it does not receive acknowledgement )
-12. Header size of TLS is also bigger than UDP ( around 20 Bytes ) and it makes a bigger chunk.
-13. TLS congestion control mechanism -> When client sees a congestion in the network it slows down the rate of sending data.
+### User facing product
 
-We can leverage **UDP** protocal for video calls because we are okay with data loss. Why **UDP** is fast
+![plot](./diagrams/user_side.png)
 
-1. Client keeps on sending packets irrespective of the fact whether packet is reaching server ( This is okay because we don't want data consistency, we want video to be real time )
-2. Header size of UDP is 8 Byte ( < 20 Bytes )
-3. No congestion mechanism
-4. No handshake
+#### Description of components of User side
 
-> Note We will use **TCP** for all other communication b/w client and server which does not include **video transfer**.
+**User Service** - Source of truth of all user related information. Lot of times many other services are calling user service into **Eco System** for the details of a particular user. Every time calling **MYSQL** will slow down the performance. So to reduce latency we can use some caching ( Reids, LRU cache ). Cache will hold all the details of user ( payload ) with key as **user_id**. **Serach Service** can call user service to get age of user to filter content based on age.
 
-#### Explanation on how video call starts
+If analytics says people are mostly going on next page and not viewing video of 1st page ( depicts bad recommendation ). It gives area of improvement ( Both for home service as well as Search Service ).
 
-![plot](./diagrams/connector.png)
-For sending request for video call **Web Socket handler** is being used ( please bear with me I will explain the details in the coming section ). After receiver receives video call communication moves to **UDP** approach.
-**Connector** - Connectoer helps user's machine to find to their public IP address. As drawn in the above diagram. **U1** sends request to router to get its public IP address, router / NAT uses it's public IP address to send this request to **Connector** ( If you do not know details of how NAT works please do google and read. It's pretty interesting no joke on this part ). Connector knows this request is coming from router with IP address **A.B.C.D** and from **port P1** it will tell NAT that this request is coming from P1. So this way U1 will know it's publicly identified **IP address** is **A.B.C.D:P1**. Similarly U2 will also identify its public IP address. Once the public IP address is identified they will share with each other using **Web Socket** based approach.
+> Note: All information about CDN's, videos lie in **Cassandra**.
+> **Host Identity Service** - It knows which video you want to play and they know from where you are coming.
+> Host service queries **Asset Service** to get all **CDN's** that are available with this video which user wants to view and given the location of the user and the location of all the videos that are there try to come up with one of the CDN that is responsible to play this particular video. They will assign CND which is clouse to geographical location of user.
 
-##### Group calling
+From analytics if eco system comes to know people of India is watching **Money Heist** very much. We could actually host a CDN in India and upload that video to that CDN to reduce the latency.
 
-All groups <= 5 users ( Small group )
-All groups > 5 users ( Large group )
+**Stream Stats Logger Service** - If video is closed after 10-20 seconds then it is probably not a good video. But if lot of people are watching more than 90% of video content it can be classified as good video
 
-**Small Group** Each user has to send message to each of the member in the call separately. Bandwidth will be shared.
-For N users in the group call, each user's bandwidth utilization will increase by ( N-1 ) times.
+### Home Page and Search HLD
 
-**Large Group**
-![plot](./diagrams/call_server.png)
-User will only send video stream packets to **Call Server** then call Server will be responsible for sending to all other users in that call. Call Server's bandwidth utilization will increase and User's bandwidth will only be utilised once inplace of in previous case it had to send packats to each user ( N-1 times). So with slow bandwidth as well user will be able to communicate seamlessly. We can increase bandwidth of Call Server that is in our control.
-We have to route it through call server if we want to record on going call. In Peer to Peer communication there is no way we can record the call. ( Practical example - I use Microsoft teams on day to day basis. If you have used it then you might have observed that when you call your colleague then you do not see **Start Recording** option ( Peer to Peer ) and if you join meeting then you see **Start Recording** option ( Through call Server ). Intersting right!! ).
-
-## High level diagram
-
-![plot](./diagrams/video_conferencing_hld.png)
+![plot](./diagrams/Home_Search.png)
