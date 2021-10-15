@@ -24,17 +24,29 @@ I am listing down the functional and non functional requirements which I think i
 - Blue components are core components
 - Component in Red are mostly related to data like databases, cache, messaging queue, big data etc ( in actual HLD )
 
-### HTTP/HTTPs and Web Socket based
+### Video Upload HLD from Production house
 
-![plot](./diagrams/http_websocket.png)
+![plot](./diagrams/production_house.png)
 
-**TCP** - http/https are TCP based. client first establishes connection with the server ( **TLS Handshake** ). TCP is a **lossless protocol** It retries to send lost data if client did not receive **acknowledgement** ( I encourage you to learn how TCP works if you do not know the internals. ). This retry of TCP slows down the communication. As in the non functional requirement we mentioned that it is okay to have some data loss until and unless it is realtime.
-Why TCP makes it slow
+> Note: Client requests chunks of videos while user is watching it requests for other set of chunks. If client realises subsequesnt chunks are not coming well in time, it starts requesting for low quality chunks ( **Adaptive bitrate streaming** )
 
-1. TLS handshake ( overburden for the communication )
-2. TLS retry mechanism makes communication slow ( If it does not receive acknowledgement )
-3. Header size of TLS is also bigger than UDP ( around 20 Bytes ) and it makes a bigger chunk.
-4. TLS congestion control mechanism -> When client sees a congestion in the network it slows down the rate of sending data.
+#### Description of components of video upload flow
+
+1. First of all production house will upload video in their machine ( VM or anything ), then in someway they will share the machine details to the platform. Then platform using **SFTP** dumps movie to its own **BLOB storage**. Admin of video also provies **metadata** information ( uploader details, description, lot of images, large variety of tags etc ). These metata information is being stored in **Cassandra**.
+2. After successful upload happens in the blob storage, Asset **onboarding service**
+   posts an event into **Kafka** about completion of storage.
+3. One of the consumer of above kafka topic is **Content Processor** ( **Workflow engine** ).
+4. In the **Workflow engine** first of all **File Chunker** will chunk the file at the very beginning. It will break entire video into small size stream chunks ( Refer the diagram for the flow ).
+5. For each chunk **Content filter** is called. It filters the chunks based on the criteria ( Violence, Vulgarity, Nudity, Piracy etc ). All filtering can be done parallely ( using many instance of Content filter. Different intance may parallely work on differnt different chunks ). After the processing is done it posts the event into Kafka.
+6. **Content Tagger** listens to above Kafka topic and does the tagging parallely on different different chunks. It creates relevant tags and **thumbnails**. ( We will discuss it in detail in near future ). After compeletion of the process it posts event as Kafka topic.
+7. **Transcoding** listens to above published topic. It converts chunks into different differnt format. Ex - AVI, MP4 etc. After compeletion of the process it posts event as Kafka topic.
+8. **Quality Converter** listens to above published topic. It converts chunk into different different quality stream. Ex - 144 p, 244 p, 480 p, 720 p etc. After compeletion of the process it posts event as Kafka topic.
+9. After the above processing, workflow engine starts to accumulate chunks of same video and it starts to upload it into **Content delivery network** ( CDN ). Then after successful completion of video upload into CDN, it posts event into Kafka. **Notification service** uses this event to send notification to production house about successful upload of their video. **Serarch consumer** will also listens to this completion event and makes this video searchable by the Users.
+
+10. TLS handshake ( overburden for the communication )
+11. TLS retry mechanism makes communication slow ( If it does not receive acknowledgement )
+12. Header size of TLS is also bigger than UDP ( around 20 Bytes ) and it makes a bigger chunk.
+13. TLS congestion control mechanism -> When client sees a congestion in the network it slows down the rate of sending data.
 
 We can leverage **UDP** protocal for video calls because we are okay with data loss. Why **UDP** is fast
 
