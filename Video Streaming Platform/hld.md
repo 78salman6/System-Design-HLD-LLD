@@ -106,6 +106,7 @@ Suppose videos -> C1 - C25 needs to be uploaded in many Local CDNs ( LC1, LC2, L
 
 A better way is push C1 - C5 into LC1; C6 - C10 into LC2; C11-C15 to LC3; C16 - C20 to LC4; C21 - C25 to LC5
 Then let local CDNs to syncup ( something like how torrent works ) among themselves. This push and syncup operation may happen at the time of low traffic. Like from 3 AM in the morning.
+
 **Advantage of Decentralization**
 
 1. No Single point of failure
